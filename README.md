@@ -1,4 +1,4 @@
-# Bubble Time - Bubble Tea Ordering System
+# My Bubble Time Cafe
 
 A web application for ordering bubble tea built with React, TypeScript, and Bootstrap.
 
