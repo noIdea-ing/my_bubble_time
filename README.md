@@ -43,28 +43,11 @@ npm install
 npm start
 ```
 
-The application will open in your default browser at `http://localhost:3000`
+The application will open in your default browser at `http://localhost:5173`
 
 ## Available Scripts
 
-- `npm start` - Runs the app in development mode
-- `npm test` - Launches the test runner
-- `npm run build` - Builds the app for production
-- `npm run eject` - Ejects from Create React App
-
-## Project Structure
-
-```
-bubble_time/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   ├── styles/
-│   └── App.tsx
-├── public/
-├── package.json
-└── README.md
-```
+- `npm run dev` - Runs the app in development mode
 
 ## Technologies Used
 
@@ -73,19 +56,3 @@ bubble_time/
 - Bootstrap
 - React Router
 - Node.js
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Support
-
-For support, please open an issue in the GitHub repository.
