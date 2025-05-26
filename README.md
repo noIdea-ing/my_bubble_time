@@ -1,6 +1,6 @@
 # My Bubble Time Cafe
 
-A web application for ordering bubble tea built with React, TypeScript, and Bootstrap.
+A web application for My Bubble Time Cafe built with React, TypeScript, and Bootstrap.
 
 ## Prerequisites
 
