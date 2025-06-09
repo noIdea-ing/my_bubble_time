@@ -35,6 +35,11 @@ const Menu: React.FC = () => {
     fetchMenuItems();
   }, []);
 
+  // Function to get placeholder food image based on item name
+  const getFoodImage = (itemName: string) => {
+    return `https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=250&fit=crop&auto=format&q=80`;
+  };
+
   return (
     <div>
       <Navbar />
@@ -61,6 +66,21 @@ const Menu: React.FC = () => {
             {menuItems.map((item) => (
               <div key={item.id} className="col-12 col-sm-6 col-md-4 col-lg-3">
                 <div className="card h-100 shadow-sm">
+                  <img 
+                    src={getFoodImage(item.name)}
+                    className="card-img-top" 
+                    alt={item.name}
+                    style={{ 
+                      height: '200px', 
+                      objectFit: 'cover',
+                      borderTopLeftRadius: '0.375rem',
+                      borderTopRightRadius: '0.375rem'
+                    }}
+                    onError={(e) => {
+                      // Fallback image if the main image fails to load
+                      e.currentTarget.src = 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&h=250&fit=crop&auto=format&q=80';
+                    }}
+                  />
                   <div className="card-body d-flex flex-column">
                     <h5 className="card-title">{item.name}</h5>
                     <div className="mt-auto">
