@@ -9,19 +9,22 @@ const Navbar = () => {
     <BootstrapNavbar bg="white" expand="lg" className="shadow-sm py-2 sticky-top custom-navbar">
       <Container>
         <BootstrapNavbar.Brand as={Link} to="/" className="d-flex align-items-center gap-2 fw-bold fs-3 text-gradient">
-          {/* Bubble tea logo SVG */}
+          {/* Bubble tea logo image */}
           <span style={{ display: 'flex', alignItems: 'center' }}>
-            <svg width="36" height="36" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <ellipse cx="24" cy="38" rx="14" ry="6" fill="#ffe0b2"/>
-              <rect x="12" y="10" width="24" height="28" rx="12" fill="#fffde7" stroke="#7c4dff" strokeWidth="2"/>
-              <ellipse cx="24" cy="38" rx="10" ry="4" fill="#ffb300"/>
-              <circle cx="18" cy="32" r="2" fill="#7c4dff"/>
-              <circle cx="24" cy="34" r="2" fill="#7c4dff"/>
-              <circle cx="30" cy="32" r="2" fill="#7c4dff"/>
-              <rect x="22" y="4" width="4" height="12" rx="2" fill="#7c4dff"/>
-            </svg>
+            <img
+              src="src\assets\bbt.jpg"
+              alt="Bubble Time Logo"
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                objectFit: 'cover',
+                boxShadow: '0 2px 8px #f3e8ff',
+                background: '#fff'
+              }}
+            />
           </span>
-          Bubble Time
+          My Bubble Time Cafe
         </BootstrapNavbar.Brand>
         <BootstrapNavbar.Toggle aria-controls="basic-navbar-nav" />
         <BootstrapNavbar.Collapse id="basic-navbar-nav">

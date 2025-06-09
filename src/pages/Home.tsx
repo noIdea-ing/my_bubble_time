@@ -23,10 +23,10 @@ const Home = () => {
         className="mb-5 shadow-sm rounded-4 animate__animated animate__fadeInDown"
       >
         <h1 className="display-3 fw-bold mb-3" style={{ color: '#7c4dff', textShadow: '1px 1px 8px #fff' }}>
-          Welcome to Bubble Time
+          Welcome to My Bubble Time Cafe
         </h1>
         <p className="lead text-muted mb-4" style={{ fontSize: '1.3rem' }}>
-          Your cozy destination for premium bubble tea and refreshing beverages
+          Your cozy destination for premium refreshing beverages and delightful foods.
         </p>
         <Button
           variant="primary"
@@ -46,9 +46,8 @@ const Home = () => {
                 <FaInfoCircle size={40} className="mb-3 text-primary" />
                 <h4>About Us</h4>
                 <p>
-                  Established in 2023, Bubble Time brings you authentic Taiwanese
-                  bubble tea with a modern twist. We carefully select our
-                  ingredients to ensure the best quality drinks.
+                  Established in 2021, My Bubble Time Cafe brings you delightful and variety foods with a modern twist. We carefully select our
+                  ingredients to ensure the best quality!
                 </p>
               </Card.Body>
             </Card>
@@ -60,8 +59,8 @@ const Home = () => {
                 <FaStar size={40} className="mb-3 text-warning" />
                 <h4>Our Specialties</h4>
                 <p>
-                  From classic milk teas to creative fruit teas, we offer a wide
-                  range of customizable drinks. Try our signature Brown Sugar Pearl
+                  From western food to authentic local foods, we offer a wide
+                  range of foods and drinks. Try our signature Brown Sugar Pearl
                   Milk Tea or refreshing Fruit Tea Series.
                 </p>
               </Card.Body>
@@ -74,9 +73,8 @@ const Home = () => {
                 <FaMapMarkerAlt size={40} className="mb-3 text-danger" />
                 <h4>Visit Us</h4>
                 <p>
-                  Open daily from 10 AM to 10 PM. Located in the heart of the
-                  city, we offer a comfortable space to enjoy your favorite
-                  drinks with friends and family.
+                  Open daily from 11.30 AM to 9 PM. Located in the kampung kia, we offer a comfortable space to enjoy your favorite
+                  drinks with friends and family. Buffet parties are enjoyed!
                 </p>
               </Card.Body>
             </Card>
