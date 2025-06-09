@@ -1,56 +1,63 @@
-import React from 'react'
-import Navbar from '../components/Navbar'
+import React, { useEffect, useState } from 'react';
+import Navbar from '../components/Navbar';
+import { supabase } from '../supabaseClient'; // Import the supabase client
 
-const Menu = () => {
-  const menuItems = [
-    {
-      category: "Classic Milk Tea",
-      items: [
-        { name: "Pearl Milk Tea", price: 7.90 },
-        { name: "Brown Sugar Milk Tea", price: 8.90 },
-        { name: "Taro Milk Tea", price: 8.90 },
-        { name: "Thai Milk Tea", price: 7.90 },
-      ]
-    },
-    {
-      category: "Fruit Tea",
-      items: [
-        { name: "Passion Fruit Green Tea", price: 8.90 },
-        { name: "Peach Oolong Tea", price: 8.90 },
-        { name: "Lemon Green Tea", price: 7.90 },
-        { name: "Strawberry Black Tea", price: 8.90 },
-      ]
-    }
-  ];
+// Define a type for your menu items for better type safety
+interface MenuItem {
+  id: number;
+  name:string;
+  price: number;
+  // Add other fields if your table has them
+}
+
+const Menu: React.FC = () => {
+  const [menuItems, setMenuItems] = useState<MenuItem[] | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchMenuItems = async () => {
+      setLoading(true);
+      setError(null);
+      // Replace 'menu_items' with your actual table name if different
+      const { data, error } = await supabase
+        .from('menu_items')
+        .select('*');
+
+      if (error) {
+        console.error('Error fetching menu items:', error);
+        setError(error.message);
+        setMenuItems(null);
+      } else {
+        setMenuItems(data);
+      }
+      setLoading(false);
+    };
+
+    fetchMenuItems();
+  }, []);
 
   return (
     <div>
       <Navbar />
-      <div className="container py-5">
-        <h1 className="text-center text-primary mb-5">Bubble Time Menu</h1>
-        
-        {menuItems.map((category, index) => (
-          <div key={index} className="mb-5">
-            <h2 className="border-bottom border-primary pb-2 mb-4">{category.category}</h2>
-            <div className="row g-4">
-              {category.items.map((item, idx) => (
-                <div key={idx} className="col-md-6 col-lg-3">
-                  <div className="card h-100 shadow-sm">
-                    <div className="card-body">
-                      <h5 className="card-title">{item.name}</h5>
-                      <p className="card-text text-primary fw-bold">
-                        RM {item.price.toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+      <h1>Menu Page</h1>
+      {loading && <p>Loading menu...</p>}
+      {error && <p style={{ color: 'red' }}>Error loading menu: {error}</p>}
+      {menuItems && menuItems.length > 0 && (
+        <ul>
+          {menuItems.map((item) => (
+            <li key={item.id}>
+              {item.name} - ${item.price}
+            </li>
+          ))}
+        </ul>
+      )}
+      {menuItems && menuItems.length === 0 && (
+        <p>No menu items found. (This could also mean your table 'menu_items' is empty or does not exist yet in Supabase)</p>
+      )}
+      {/* Content for menu page */}
     </div>
-  )
-}
+  );
+};
 
-export default Menu
+export default Menu;
