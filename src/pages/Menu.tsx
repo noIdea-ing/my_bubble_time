@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import Navbar from '../components/Navbar';
-import { supabase } from '../supabaseClient'; // Import the supabase client
+import { supabase } from '../supabaseClient'
 
-// Define a type for your menu items for better type safety
 interface MenuItem {
-  id: number;
-  name:string;
+  id: string;
+  name: string;
   price: number;
-  // Add other fields if your table has them
 }
 
 const Menu: React.FC = () => {
@@ -19,14 +17,14 @@ const Menu: React.FC = () => {
     const fetchMenuItems = async () => {
       setLoading(true);
       setError(null);
-      // Replace 'menu_items' with your actual table name if different
+      
       const { data, error } = await supabase
-        .from('menu_items')
-        .select('*');
+        .from('menuItem')
+        .select('id, name, price');
 
       if (error) {
         console.error('Error fetching menu items:', error);
-        setError(error.message);
+        setError(`Error: ${error.message}`);
         setMenuItems(null);
       } else {
         setMenuItems(data);
@@ -40,22 +38,52 @@ const Menu: React.FC = () => {
   return (
     <div>
       <Navbar />
-      <h1>Menu Page</h1>
-      {loading && <p>Loading menu...</p>}
-      {error && <p style={{ color: 'red' }}>Error loading menu: {error}</p>}
-      {menuItems && menuItems.length > 0 && (
-        <ul>
-          {menuItems.map((item) => (
-            <li key={item.id}>
-              {item.name} - ${item.price}
-            </li>
-          ))}
-        </ul>
-      )}
-      {menuItems && menuItems.length === 0 && (
-        <p>No menu items found. (This could also mean your table 'menu_items' is empty or does not exist yet in Supabase)</p>
-      )}
-      {/* Content for menu page */}
+      <div className="container mt-4">
+        <h1 className="text-center mb-4">Our Menu</h1>
+        
+        {loading && (
+          <div className="text-center">
+            <div className="spinner-border" role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+            <p className="mt-2">Loading menu...</p>
+          </div>
+        )}
+        
+        {error && (
+          <div className="alert alert-danger" role="alert">
+            Error loading menu: {error}
+          </div>
+        )}
+        
+        {menuItems && menuItems.length > 0 && (
+          <div className="row g-4">
+            {menuItems.map((item) => (
+              <div key={item.id} className="col-12 col-sm-6 col-md-4 col-lg-3">
+                <div className="card h-100 shadow-sm">
+                  <div className="card-body d-flex flex-column">
+                    <h5 className="card-title">{item.name}</h5>
+                    <div className="mt-auto">
+                      <div className="d-flex justify-content-between align-items-center">
+                        <span className="h4 text-primary mb-0">RM{item.price}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {menuItems && menuItems.length === 0 && (
+          <div className="text-center">
+            <div className="alert alert-info" role="alert">
+              <h4 className="alert-heading">No Menu Items</h4>
+              <p>No menu items found. Please check back later.</p>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
