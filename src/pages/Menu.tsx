@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Navbar from '../components/Navbar';
-import { supabase } from '../supabaseClient'
+import { supabase } from '../supabaseClient';
 
 interface MenuItem {
   id: string;
@@ -17,7 +17,7 @@ const Menu: React.FC = () => {
     const fetchMenuItems = async () => {
       setLoading(true);
       setError(null);
-      
+
       const { data, error } = await supabase
         .from('menuItem')
         .select('id, name, price');
@@ -35,9 +35,21 @@ const Menu: React.FC = () => {
     fetchMenuItems();
   }, []);
 
-  // Function to get placeholder food image based on item name
-  const getFoodImage = (itemName: string) => {
-    return `https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=250&fit=crop&auto=format&q=80`;
+  // Map menu item names (lowercase) to assets folder images (relative path)
+  const imageMap: Record<string, string> = {
+    'nasi lemak': 'src/assets/nasilemak.jpg',
+    'green tea': 'src/assets/greentea.jpg',
+    'teh ais': 'src/assets/tea.jpg',
+    'nasi buttermilk': 'src/assets/nasibuttermilk.jpg',
+    'maggi goreng': 'src/assets/maggiegoreng.jpg',
+  };
+
+  // Fallback image if not found
+  const fallbackImage = 'assets/bubble-tea.jpg';
+
+  const getImageForMenuItem = (name: string) => {
+    const key = name.trim().toLowerCase();
+    return imageMap[key] || fallbackImage;
   };
 
   return (
@@ -67,7 +79,7 @@ const Menu: React.FC = () => {
               <div key={item.id} className="col-12 col-sm-6 col-md-4 col-lg-3">
                 <div className="card h-100 shadow-sm">
                   <img 
-                    src={getFoodImage(item.name)}
+                    src={getImageForMenuItem(item.name)}
                     className="card-img-top" 
                     alt={item.name}
                     style={{ 
@@ -78,7 +90,7 @@ const Menu: React.FC = () => {
                     }}
                     onError={(e) => {
                       // Fallback image if the main image fails to load
-                      e.currentTarget.src = 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&h=250&fit=crop&auto=format&q=80';
+                      e.currentTarget.src = fallbackImage;
                     }}
                   />
                   <div className="card-body d-flex flex-column">

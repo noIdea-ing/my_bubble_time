@@ -73,7 +73,7 @@ const Home = () => {
                 <FaMapMarkerAlt size={40} className="mb-3 text-danger" />
                 <h4>Visit Us</h4>
                 <p>
-                  Open daily from 11.30 AM to 9 PM. Located in the kampung kia, we offer a comfortable space to enjoy your favorite
+                  Open daily from 11.30 AM to 9 PM. Located in the Parit Raja, we offer a comfortable space to enjoy your favorite
                   drinks with friends and family. Buffet parties are enjoyed!
                 </p>
               </Card.Body>
