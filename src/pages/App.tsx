@@ -1,22 +1,18 @@
 import React from 'react'
-import { Routes, Route, Link } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import Home from './Home'
 import Menu from './Menu'
 
-const App = () => {
+function App() {
   return (
-    <div>
-      <nav>
-        <Link to="/home">Home</Link>
-        <Link to="/menu">Menu</Link>
-      </nav>
-
+    <Router>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/menu" element={<Menu />} />
       </Routes>
-    </div>
+    </Router>
   )
 }
 
 export default App
+// ...existing imports...
