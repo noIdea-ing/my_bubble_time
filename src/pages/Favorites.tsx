@@ -1,114 +1,99 @@
 import React, { useEffect, useState } from 'react';
-import { Container, Row, Col, Card, Spinner } from 'react-bootstrap';
+import { Container, Table, Spinner, Alert } from 'react-bootstrap';
 import { supabase } from '../supabaseClient';
 import Navbar from '../components/Navbar';
-import { FaHeart } from 'react-icons/fa';
+import { FaHeart, FaTrophy } from 'react-icons/fa';
 
-// Update interfaces to match ERD
-interface MenuItem {
+interface TopFavoriteItem {
   id: string;
   name: string;
   price: number;
   category_id: string;
-  admin_id: string;
+  category_name: string;
+  favorite_count: number;
   image_url?: string;
 }
 
-interface Category {
+interface FavoriteWithMenuItem {
   id: string;
-  name: string;
-  admin_id: string;
+  menuItem: {
+    id: string;
+    name: string;
+    price: number;
+    category_id: string;
+    image_url: string | null;
+    categories: {
+      name: string;
+    } | null;
+  } | null;
 }
 
-interface FavouriteRecord {
-  id: string;
-  user_id: string;
-  menuitem_id: string;
-  menuItem: MenuItem;
-}
-
-interface TopMenuItem extends MenuItem {
-  favorite_count: number;
-}
-
-const Favorites = () => {
+const TopFavorites = () => {
   const [loading, setLoading] = useState(true);
-  const [foodItems, setFoodItems] = useState<TopMenuItem[]>([]);
-  const [drinkItems, setDrinkItems] = useState<TopMenuItem[]>([]);
+  const [topItems, setTopItems] = useState<TopFavoriteItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchTopFavorites = async () => {
       try {
-        // First get categories to determine food vs drinks
-        const { data: categories, error: catError } = await supabase
-          .from('categories')
-          .select('*');
-
-        if (catError) throw catError;
-
-        if (!categories) {
-          setError('No categories found');
-          return;
-        }
-
-        // Get favorites with joined menu items
+        // Get all favorites with menu item details and category information
         const { data: favorites, error: favError } = await supabase
           .from('favourites')
           .select(`
             id,
-            menuitem_id,
-            user_id,
-            menuitem (
+            menuItem (
               id,
               name,
               price,
               category_id,
-              image_url
+              image_url,
+              categories (
+                name
+              )
             )
-          `);
+          `) as { data: FavoriteWithMenuItem[] | null, error: any };
 
         if (favError) throw favError;
 
-        if (!favorites) {
+        if (!favorites || favorites.length === 0) {
           setError('No favorites found');
+          setLoading(false);
           return;
         }
 
-        // Process favorites
-        const itemCounts: { [key: string]: TopMenuItem } = {};
+        // Count favorites for each menu item
+        const itemCounts: { [key: string]: TopFavoriteItem } = {};
+        
         favorites.forEach(fav => {
-          if (fav.menuitem) {
-            const item = fav.menuitem;
-            if (!itemCounts[item.id]) {
-              itemCounts[item.id] = {
-                ...item,
-                favorite_count: 0
+          if (fav.menuItem) {
+            const item = fav.menuItem;
+            const itemId = item.id;
+            
+            if (!itemCounts[itemId]) {
+              itemCounts[itemId] = {
+                id: item.id,
+                name: item.name,
+                price: item.price,
+                category_id: item.category_id,
+                category_name: item.categories?.name || 'Unknown Category',
+                favorite_count: 0,
+                image_url: item.image_url || undefined
               };
             }
-            itemCounts[item.id].favorite_count++;
+            itemCounts[itemId].favorite_count++;
           }
         });
 
-        // Separate food and drinks
-        const foods = Object.values(itemCounts)
-          .filter(item => categories
-            .find(c => c.id === item.category_id && c.name.toLowerCase().includes('food')))
+        // Sort by favorite count and get top 10
+        const sortedItems = Object.values(itemCounts)
           .sort((a, b) => b.favorite_count - a.favorite_count)
-          .slice(0, 5);
+          .slice(0, 10);
 
-        const drinks = Object.values(itemCounts)
-          .filter(item => categories
-            .find(c => c.id === item.category_id && c.name.toLowerCase().includes('drink')))
-          .sort((a, b) => b.favorite_count - a.favorite_count)
-          .slice(0, 5);
-
-        setFoodItems(foods);
-        setDrinkItems(drinks);
+        setTopItems(sortedItems);
 
       } catch (error) {
-        console.error('Error fetching favorites:', error);
-        setError('Failed to load favorites');
+        console.error('Error fetching top favorites:', error);
+        setError('Failed to load favorite items');
       } finally {
         setLoading(false);
       }
@@ -125,113 +110,142 @@ const Favorites = () => {
     return data.publicUrl;
   };
 
+
+  const getRankBadge = (position: number) => {
+    if (position <= 3) return 'bg-dark text-white';
+    return 'bg-secondary text-white';
+  };
+
   if (loading) {
     return (
       <div>
-        <Navbar showLogin={() => {}} />
+        <Navbar/>
         <div className="d-flex justify-content-center align-items-center" 
              style={{ height: 'calc(100vh - 76px)' }}>
-          <Spinner animation="border" variant="primary" />
+          <Spinner animation="border" style={{ color: '#333' }} />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-light min-vh-100">
-      <Navbar showLogin={() => {}} />
+    <div style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
+      <Navbar/>
       <Container className="py-5">
-        {/* Food Section */}
-        <div className="mb-5">
-          <h2 className="text-center mb-4">Top 5 Favorite Foods</h2>
-          <Row className="justify-content-center">
-            {foodItems.map((item, index) => (
-              <Col key={item.id} xs={12} sm={6} md={4} lg={3} className="mb-4">
-                <Card className="h-100 shadow-sm hover-card position-relative">
-                  <div className="position-absolute top-0 start-0 m-3">
-                    <span className="badge bg-primary">#{index + 1}</span>
-                  </div>
-                  <div style={{ height: '200px', overflow: 'hidden' }}>
-                    {item.image_url ? (
-                      <Card.Img
-                        variant="top"
-                        src={getImageUrl(item.image_url)}
-                        style={{ height: '100%', objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <div className="h-100 bg-light d-flex align-items-center justify-content-center">
-                        <span className="text-muted">No image</span>
-                      </div>
-                    )}
-                  </div>
-                  <Card.Body>
-                    <Card.Title>{item.name}</Card.Title>
-                    <div className="d-flex justify-content-between align-items-center">
-                      <span className="text-primary">RM{item.price.toFixed(2)}</span>
-                      <div className="d-flex align-items-center text-danger">
-                        <FaHeart className="me-1" />
-                        <span>{item.favorite_count}</span>
-                      </div>
-                    </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-            ))}
-          </Row>
+        <div className="text-center mb-5">
+          <h1 className="display-4" style={{ color: '#333' }}>
+            <FaHeart className="me-3" style={{ color: '#333' }} />
+            Top 10 Customer Favorites
+          </h1>
+          <p className="lead" style={{ color: '#666' }}>Most loved items by our customers</p>
         </div>
 
-        {/* Drinks Section */}
-        <div>
-          <h2 className="text-center mb-4">Top 5 Favorite Drinks</h2>
-          <Row className="justify-content-center">
-            {drinkItems.map((item, index) => (
-              <Col key={item.id} xs={12} sm={6} md={4} lg={3} className="mb-4">
-                <Card className="h-100 shadow-sm hover-card position-relative">
-                  <div className="position-absolute top-0 start-0 m-3">
-                    <span className="badge bg-primary">#{index + 1}</span>
-                  </div>
-                  <div style={{ height: '200px', overflow: 'hidden' }}>
-                    {item.image_url ? (
-                      <Card.Img
-                        variant="top"
-                        src={getImageUrl(item.image_url)}
-                        style={{ height: '100%', objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <div className="h-100 bg-light d-flex align-items-center justify-content-center">
-                        <span className="text-muted">No image</span>
-                      </div>
-                    )}
-                  </div>
-                  <Card.Body>
-                    <Card.Title>{item.name}</Card.Title>
-                    <div className="d-flex justify-content-between align-items-center">
-                      <span className="text-primary">RM{item.price.toFixed(2)}</span>
-                      <div className="d-flex align-items-center text-danger">
-                        <FaHeart className="me-1" />
-                        <span>{item.favorite_count}</span>
-                      </div>
-                    </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-            ))}
-          </Row>
-        </div>
+        {error ? (
+          <Alert variant="secondary" className="text-center">
+            {error}
+          </Alert>
+        ) : topItems.length === 0 ? (
+          <Alert variant="light" className="text-center border">
+            No favorite items found yet.
+          </Alert>
+        ) : (
+          <div className="card shadow-sm border-0">
+            <div className="card-body p-0">
+              <Table responsive hover className="mb-0">
+                <thead style={{ backgroundColor: '#333', color: 'white' }}>
+                  <tr>
+                    <th className="text-center" style={{ width: '80px' }}>Rank</th>
+                    <th style={{ width: '100px' }}>Image</th>
+                    <th>Item Name</th>
+                    <th>Category</th>
+                    <th className="text-end">Price (RM)</th>
+                    <th className="text-center">
+                      <FaHeart className="me-1" />
+                      Favorites
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topItems.map((item, index) => {
+                    const position = index + 1;
+                    return (
+                      <tr key={item.id} className="align-middle">
+                        <td className="text-center">
+                          <span className={`badge ${getRankBadge(position)} fs-6 p-2`}>
+                            {position}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ width: '80px', height: '60px', overflow: 'hidden', borderRadius: '8px' }}>
+                            {item.image_url ? (
+                              <img
+                                src={getImageUrl(item.image_url)}
+                                alt={item.name}
+                                style={{ 
+                                  width: '100%', 
+                                  height: '100%', 
+                                  objectFit: 'cover' 
+                                }}
+                                className="border"
+                              />
+                            ) : (
+                              <div className="w-100 h-100 border d-flex align-items-center justify-content-center" 
+                                   style={{ backgroundColor: '#f8f9fa' }}>
+                                <span style={{ color: '#666', fontSize: '12px' }}>No image</span>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <div className="fw-bold" style={{ color: '#333' }}>{item.name}</div>
+                        </td>
+                        <td>
+                          <span className="badge bg-light border" style={{ color: '#333' }}>
+                            {item.category_name}
+                          </span>
+                        </td>
+                        <td className="text-end">
+                          <span className="fw-bold" style={{ color: '#333' }}>
+                            {item.price.toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="text-center">
+                          <div className="d-flex align-items-center justify-content-center">
+                            <FaHeart className="me-2" style={{ color: '#333' }} />
+                            <span className="fw-bold fs-5" style={{ color: '#333' }}>
+                              {item.favorite_count}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </Table>
+            </div>
+          </div>
+        )}
+
+        {topItems.length > 0 && (
+          <div className="text-center mt-4">
+            <small style={{ color: '#666' }}>
+              Based on customer favorites • Updated in real-time
+            </small>
+          </div>
+        )}
       </Container>
 
       <style>{`
-        .hover-card {
-          transition: transform 0.2s, box-shadow 0.2s;
+        .table tbody tr:hover {
+          background-color: rgba(0, 0, 0, 0.02);
         }
         
-        .hover-card:hover {
-          transform: translateY(-5px);
-          box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
+        .badge {
+          font-size: 0.9em;
         }
       `}</style>
     </div>
   );
 };
 
-export default Favorites;
+export default TopFavorites;

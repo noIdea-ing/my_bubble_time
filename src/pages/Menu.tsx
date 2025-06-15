@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import Navbar from '../components/Navbar'; // Make sure this is the same as Home
+import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { Container, Row, Col, Spinner, Button, Modal, Form, Alert, Toast, ToastContainer } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
+import { Container, Row, Col, Spinner, Toast, ToastContainer } from 'react-bootstrap';
 import { FaHeart, FaRegHeart } from 'react-icons/fa';
+import Navbar from '../components/Navbar';
 
 interface MenuItem {
   id: string;
@@ -23,333 +22,181 @@ const Menu: React.FC = () => {
   const [categoriesWithItems, setCategoriesWithItems] = useState<CategoryWithItems[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [favoriteLoading, setFavoriteLoading] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVariant, setToastVariant] = useState<'success' | 'danger'>('success');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
 
-  // Login modal state
-  const [showLogin, setShowLogin] = useState(false);
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [username, setUsername] = useState('');
-  const [loadingAuth, setLoadingAuth] = useState(false);
-  const [errorAuth, setErrorAuth] = useState<string | null>(null);
+  // Memoized function to show toast messages
+  const showToastMessage = useCallback((message: string, variant: 'success' | 'danger' = 'success') => {
+    setToastMessage(message);
+    setToastVariant(variant);
+    setShowToast(true);
+  }, []);
 
-  const navigate = useNavigate();
-
-  // Check user authentication and initialize favorites
+  // Check session and get current user from sessionStorage
   useEffect(() => {
-    const getInitialUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      
-      if (user) {
-        await initializeUserFavorites(user.email);
+    const getUserSession = () => {
+      try {
+        // Get user from sessionStorage instead of localStorage
+        const storedUserId = sessionStorage.getItem('userId');
+        const storedUserRole = sessionStorage.getItem('userRole');
+        
+        if (storedUserId) {
+          setCurrentUserId(storedUserId);
+        } else {
+          setCurrentUserId(null);
+        }
+        
+      } catch (error) {
+        console.error('Error checking user session:', error);
+        setCurrentUserId(null);
+      } finally {
+        setSessionLoading(false);
       }
     };
 
-    getInitialUser();
+    getUserSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await initializeUserFavorites(session.user.email);
-      } else {
-        setFavorites([]);
+    // Listen for storage changes (when user logs in/out in another tab)
+    // Note: sessionStorage events don't work across tabs, but keeping for potential localStorage usage
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'userId') {
+        if (e.newValue) {
+          setCurrentUserId(e.newValue);
+          initializeFavorites(e.newValue);
+        } else {
+          setCurrentUserId(null);
+          setFavorites([]);
+        }
       }
-    });
+    };
 
-    return () => subscription.unsubscribe();
-  }, []);
+    window.addEventListener('storage', handleStorageChange);
 
-  const initializeUserFavorites = async (email: string | undefined) => {
-    if (!email) return;
-    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [currentUserId]);
+
+  // Initialize favorites when user is available
+  useEffect(() => {
+    if (currentUserId && !sessionLoading) {
+      initializeFavorites(currentUserId);
+    }
+  }, [currentUserId, sessionLoading]);
+
+  const initializeFavorites = async (userId: string) => {
     try {
-      console.log('Initializing favourites for email:', email);
-      
-      // First get the user_id from usersBT table
-      const { data: userData, error: userError } = await supabase
-        .from('usersBT')
-        .select('id')
-        .eq('email', email)
-        .single();
-      
-      if (userError || !userData) {
-        console.error('Error getting user ID:', userError);
-        return;
-      }
-
-      console.log('User ID found:', userData.id);
-
-      // Check if favourites table exists and get user's favorites
-      const { data: existingRecords, error: checkError } = await supabase
+      // Get user's favorites
+      const { data: favoriteRecords, error: favoriteError } = await supabase
         .from('favourites')
-        .select('id, menuitem_id')
-        .eq('user_id', userData.id)
-        .not('menuitem_id', 'is', null);
+        .select('menuItem_id')
+        .eq('user_id', userId);
       
-      if (checkError) {
-        console.error('Error checking existing favorites:', checkError);
+      if (favoriteError) {
+        console.error('Error loading favorites:', favoriteError);
         
-        // Check if it's a table not found error
-        if (checkError.code === 'PGRST116' || checkError.message.includes('relation "public.favourites" does not exist')) {
-          console.log('Favourites table does not exist. User favourites will not be loaded.');
+        // Check if table doesn't exist
+        if (favoriteError.code === 'PGRST116' || favoriteError.message.includes('relation "public.favourites" does not exist')) {
+          console.log('Favourites table does not exist. Favorites will work in memory only.');
           return;
         }
         
-        setToastMessage('Could not load your favourites');
-        setToastVariant('danger');
-        setShowToast(true);
+        showToastMessage('Could not load your favourites', 'danger');
         return;
       }
 
       // Load existing favorites
-      if (existingRecords && existingRecords.length > 0) {
-        const actualFavorites = existingRecords.map(record => record.menuitem_id);
-        console.log('Loaded existing favourites:', actualFavorites);
-        setFavorites(actualFavorites);
+      if (favoriteRecords && favoriteRecords.length > 0) {
+        const favoriteIds = favoriteRecords.map(record => record.menuItem_id);
+        setFavorites(favoriteIds);
       } else {
-        console.log('No existing favourites found for user:', userData.id);
         setFavorites([]);
       }
     } catch (error) {
       console.error('Error initializing favourites:', error);
-      setToastMessage('Error setting up favourites');
-      setToastVariant('danger');
-      setShowToast(true);
+      showToastMessage('Error setting up favourites', 'danger');
     }
   };
 
   const toggleFavorite = async (itemId: string, itemName: string) => {
-    if (!user) {
-      setToastMessage('Please login to add favourites');
-      setToastVariant('danger');
-      setShowToast(true);
+    // Check if user is logged in
+    if (!currentUserId) {
+      showToastMessage('Please log in to add favorites', 'danger');
       return;
     }
 
+    // Prevent multiple clicks on the same item
+    if (favoriteLoading === itemId) {
+      return;
+    }
+
+    setFavoriteLoading(itemId);
+
     try {
-      // First get the user_id from usersBT table
-      const { data: userData, error: userError } = await supabase
-        .from('usersBT')
-        .select('id')
-        .eq('email', user.email)
-        .single();
-      
-      if (userError || !userData) {
-        console.error('Error getting user ID:', userError);
-        setToastMessage('Error accessing user data');
-        setToastVariant('danger');
-        setShowToast(true);
-        return;
-      }
-
-      // Verify the menu item exists in the database
-      const { data: menuItemData, error: menuItemError } = await supabase
-        .from('menuItem')
-        .select('id')
-        .eq('id', itemId)
-        .single();
-
-      if (menuItemError || !menuItemData) {
-        console.error('Menu item not found:', menuItemError);
-        setToastMessage('Menu item not found');
-        setToastVariant('danger');
-        setShowToast(true);
-        return;
-      }
-
       const isFavorite = favorites.includes(itemId);
       
       if (isFavorite) {
-        // Remove from favourites
-        console.log('Removing from favourites:', { user_id: userData.id, menuitem_id: itemId });
         
         const { error } = await supabase
           .from('favourites')
           .delete()
-          .eq('user_id', userData.id)
-          .eq('menuitem_id', itemId);
+          .eq('user_id', currentUserId)
+          .eq('menuItem_id', itemId);
         
         if (error) {
           console.error('Error removing favourite:', error);
           throw error;
         }
         
+        // Update state immediately for better UX
         setFavorites(prev => prev.filter(id => id !== itemId));
-        setToastMessage(`${itemName} removed from favourites`);
-        setToastVariant('success');
+        showToastMessage(`${itemName} removed from favourites`, 'success');
       } else {
-        // Add to favourites
-        console.log('Adding new favourite:', { user_id: userData.id, menuitem_id: itemId });
-        
-        // Check if the record already exists (to prevent duplicates)
-        const { data: existingFavorite, error: checkError } = await supabase
+        // Add to favourites - Check if it already exists first
+        const { error } = await supabase
           .from('favourites')
-          .select('id')
-          .eq('user_id', userData.id)
-          .eq('menuitem_id', itemId)
-          .single();
-
-        if (checkError && checkError.code !== 'PGRST116') {
-          // Error other than "no rows returned"
-          console.error('Error checking existing favourite:', checkError);
-        }
-
-        if (existingFavorite) {
-          // Already exists, just update state
-          setFavorites(prev => [...prev, itemId]);
-          setToastMessage(`${itemName} is already in your favourites`);
-          setToastVariant('success');
-        } else {
-          // Insert new favorite
-          const { error } = await supabase
-            .from('favourites')
-            .insert([{
-              user_id: userData.id,
-              menuitem_id: itemId
-            }]);
-          
-          if (error) {
-            console.error('Error adding favourite:', error);
+          .insert([{
+            user_id: currentUserId,
+            menuItem_id: itemId
+          }]);
+        
+        if (error) {
+          if (error.code === '23505') {
+            // Duplicate key error - item already exists, just update UI
+            setFavorites(prev => [...prev, itemId]);
+            showToastMessage(`${itemName} is already in favourites`, 'success');
+          } else {
             throw error;
           }
-          
+        } else {
+          // Successfully added
           setFavorites(prev => [...prev, itemId]);
-          setToastMessage(`${itemName} added to favourites`);
-          setToastVariant('success');
+          showToastMessage(`${itemName} added to favourites`, 'success');
         }
       }
-      
-      setShowToast(true);
     } catch (error: any) {
       console.error('Error toggling favourite:', error);
       
-      // Provide more specific error messages
+      // Provide specific error messages
       let errorMessage = 'Error updating favourites';
       
       if (error.code === 'PGRST116' || error.message?.includes('relation "public.favourites" does not exist')) {
         errorMessage = 'Favourites feature is not available. Please contact support.';
-      } else if (error.code === '23505') {
-        errorMessage = 'This item is already in your favourites';
       } else if (error.code === '23503') {
-        errorMessage = 'Invalid menu item or user. Please refresh and try again.';
-      } else if (error.message?.includes('JWT expired') || error.message?.includes('Invalid JWT')) {
-        errorMessage = 'Please login again to manage favourites';
-      } else if (error.message?.includes('400')) {
-        errorMessage = 'Invalid request. Please check your data and try again.';
+        errorMessage = 'Invalid menu item. Please refresh and try again.';
+      } else if (error.code === '23505') {
+        // Duplicate key error - item already in favorites
+        errorMessage = 'Item is already in your favourites';
       }
       
-      setToastMessage(errorMessage);
-      setToastVariant('danger');
-      setShowToast(true);
-    }
-  };
-
-  const handleModalClose = () => {
-    setShowLogin(false);
-    setErrorAuth(null);
-    setEmail('');
-    setPassword('');
-    setUsername('');
-    setIsRegistering(false);
-  };
-
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoadingAuth(true);
-    setErrorAuth(null);
-
-    try {
-      if (!isRegistering) {
-        // Login
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) {
-          setErrorAuth(error.message);
-          return;
-        }
-
-        if (data.user) {
-          // Get user role
-          const { data: userData, error: roleError } = await supabase
-            .from('usersBT')
-            .select('role')
-            .eq('email', data.user.email)
-            .single();
-
-          if (roleError) {
-            setErrorAuth('Error fetching user data');
-            return;
-          }
-
-          setShowLogin(false);
-
-          if (userData.role === 'admin') {
-            navigate('/AdminHome');
-          } else {
-            window.location.reload();
-          }
-        }
-      } else {
-        // Registration
-        const { data: existingUser } = await supabase
-          .from('usersBT')
-          .select('email')
-          .eq('email', email)
-          .single();
-
-        if (existingUser) {
-          setErrorAuth('Email already registered');
-          setLoadingAuth(false);
-          return;
-        }
-
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-
-        if (error) {
-          setErrorAuth(error.message);
-          setLoadingAuth(false);
-          return;
-        }
-
-        if (data.user) {
-          const { error: insertError } = await supabase
-            .from('usersBT')
-            .insert([
-              {
-                email: data.user.email,
-                username: username || email.split('@')[0],
-                role: 'user',
-              },
-            ]);
-
-          if (insertError) {
-            setErrorAuth('Error creating user profile');
-            return;
-          }
-
-          setErrorAuth('Registration successful! You can now login.');
-          setIsRegistering(false);
-          setEmail('');
-          setPassword('');
-          setUsername('');
-        }
-      }
-    } catch (error) {
-      setErrorAuth('An unexpected error occurred');
+      showToastMessage(errorMessage, 'danger');
     } finally {
-      setLoadingAuth(false);
+      setFavoriteLoading(null);
     }
   };
 
@@ -361,6 +208,7 @@ const Menu: React.FC = () => {
     return data.publicUrl;
   };
 
+  // Fetch menu data on component mount
   useEffect(() => {
     const fetchMenuData = async () => {
       setLoading(true);
@@ -393,7 +241,7 @@ const Menu: React.FC = () => {
 
         setCategoriesWithItems(categoriesWithItemsData);
       } catch (err: any) {
-        setError(`Error: ${err.message}`);
+        setError(`Error loading menu: ${err.message}`);
       } finally {
         setLoading(false);
       }
@@ -404,59 +252,92 @@ const Menu: React.FC = () => {
 
   return (
     <div className="bg-white min-vh-100">
-      {/* Use the same Navbar as Home, pass showLogin */}
-      <Navbar showLogin={() => setShowLogin(true)} />
-      <Container className="py-5">
-        <h2 className="text-center mb-5 fw-bold text-dark">Our Menu</h2>
+      <Navbar />
+
+      <Container className="py-4">
         {loading && (
           <div className="text-center my-5">
             <Spinner animation="border" variant="primary" />
-            <p className="mt-2">Loading menu...</p>
+            <p className="mt-3 text-muted">Loading delicious menu items...</p>
           </div>
         )}
+
         {error && (
-          <div className="alert alert-danger text-center">{error}</div>
+          <div className="alert alert-danger text-center mb-5">
+            <i className="bi bi-exclamation-triangle-fill me-2"></i>
+            {error}
+          </div>
         )}
-        {!loading && categoriesWithItems.length === 0 && (
+
+        {!loading && categoriesWithItems.length === 0 && !error && (
           <div className="alert alert-info text-center">
+            <i className="bi bi-info-circle-fill me-2"></i>
             No menu items found. Please check back later.
           </div>
         )}
+
+        {/* User Status Info */}
+        {!sessionLoading && !currentUserId && (
+          <div className="alert alert-info text-center mb-4">
+            <i className="bi bi-info-circle-fill me-2"></i>
+            Log in to save your favorite items!
+          </div>
+        )}
+
+        {/* Display Categories and Menu Items */}
         {categoriesWithItems.map(category => (
           <div key={category.id} className="mb-5">
-            <h3 className="text-primary border-bottom pb-2 mb-4 fw-semibold">{category.name}</h3>
+            <div className="d-flex align-items-center mb-4">
+              <h2 className="text-primary fw-bold mb-0">{category.name}</h2>
+              <div className="flex-grow-1 ms-3" style={{ height: '2px', background: 'linear-gradient(to right, #007bff, transparent)' }}></div>
+              <span className="badge bg-primary-subtle text-primary ms-3">
+                {category.items.length} item{category.items.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+
             {category.items.length > 0 ? (
               <Row className="g-4">
                 {category.items.map(item => (
                   <Col key={item.id} xs={12} sm={6} md={4} lg={3}>
-                    <div className="card h-100 shadow-sm hover-card rounded-4 border-0 position-relative">
-                      {/* Favorite Button - Only show for logged in users */}
-                      {user && (
+                    <div className="card h-100 shadow-sm hover-card rounded-4 border-0 position-relative overflow-hidden">
+                      {/* Favorite Button - Only show if user is logged in */}
+                      {currentUserId && (
                         <button
                           className="favorite-btn position-absolute"
                           onClick={() => toggleFavorite(item.id, item.name)}
+                          disabled={favoriteLoading === item.id}
                           style={{
-                            top: '10px',
-                            right: '10px',
-                            background: 'rgba(255, 255, 255, 0.9)',
+                            top: '12px',
+                            right: '12px',
+                            background: 'rgba(255, 255, 255, 0.95)',
                             border: 'none',
                             borderRadius: '50%',
-                            padding: '8px',
-                            zIndex: 2,
+                            padding: '10px',
+                            zIndex: 3,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            transition: 'all 0.2s ease'
+                            transition: 'all 0.3s ease',
+                            cursor: favoriteLoading === item.id ? 'not-allowed' : 'pointer',
+                            opacity: favoriteLoading === item.id ? 0.7 : 1,
+                            width: '44px',
+                            height: '44px'
                           }}
                         >
-                          {favorites.includes(item.id) ? (
-                            <FaHeart color="#dc3545" size={16} />
+                          {favoriteLoading === item.id ? (
+                            <div className="spinner-border spinner-border-sm text-primary" role="status" style={{ width: '18px', height: '18px' }}>
+                              <span className="visually-hidden">Loading...</span>
+                            </div>
+                          ) : favorites.includes(item.id) ? (
+                            <FaHeart color="#dc3545" size={20} />
                           ) : (
-                            <FaRegHeart color="#6c757d" size={16} />
+                            <FaRegHeart color="#6c757d" size={20} />
                           )}
                         </button>
                       )}
-                      <div style={{ height: '200px', overflow: 'hidden', borderTopLeftRadius: '1rem', borderTopRightRadius: '1rem' }}>
+
+                      {/* Item Image */}
+                      <div className="position-relative" style={{ height: '220px', overflow: 'hidden' }}>
                         {item.image_url ? (
                           <img
                             src={getImageUrl(item.image_url)}
@@ -466,26 +347,39 @@ const Menu: React.FC = () => {
                               height: '100%',
                               width: '100%',
                               objectFit: 'cover',
-                              borderTopLeftRadius: '1rem',
-                              borderTopRightRadius: '1rem'
+                              transition: 'transform 0.3s ease'
                             }}
                           />
                         ) : (
                           <div
-                            className="d-flex align-items-center justify-content-center bg-light"
-                            style={{ height: '100%' }}
+                            className="d-flex align-items-center justify-content-center bg-light h-100"
                           >
                             <div className="text-center text-muted">
-                              <i className="bi bi-image" style={{ fontSize: '2rem' }}></i>
-                              <div className="small">No Image</div>
+                              <i className="bi bi-image" style={{ fontSize: '3rem' }}></i>
+                              <div className="mt-2">No Image Available</div>
                             </div>
                           </div>
                         )}
+                        {/* Gradient overlay for better text readability */}
+                        <div className="position-absolute bottom-0 start-0 end-0" style={{
+                          background: 'linear-gradient(transparent, rgba(0,0,0,0.1))',
+                          height: '50px'
+                        }}></div>
                       </div>
-                      <div className="card-body d-flex flex-column">
-                        <h5 className="card-title mb-2 fw-semibold">{item.name}</h5>
-                        <div className="mt-auto">
-                          <span className="h5 text-primary mb-0">RM{item.price.toFixed(2)}</span>
+
+                      {/* Item Details */}
+                      <div className="card-body d-flex flex-column p-4">
+                        <h5 className="card-title mb-2 fw-semibold text-dark">{item.name}</h5>
+                        <div className="mt-auto pt-2">
+                          <div className="d-flex align-items-center justify-content-between">
+                            <span className="h4 text-primary mb-0 fw-bold">RM{item.price.toFixed(2)}</span>
+                            {currentUserId && favorites.includes(item.id) && (
+                              <span className="badge bg-danger-subtle text-danger">
+                                <i className="bi bi-heart-fill me-1"></i>
+                                Favorite
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -493,196 +387,133 @@ const Menu: React.FC = () => {
                 ))}
               </Row>
             ) : (
-              <div className="alert alert-light text-center">
-                <i className="bi bi-basket me-2"></i>
-                No items in this category yet.
+              <div className="alert alert-light text-center py-4">
+                <i className="bi bi-basket me-2 text-muted" style={{ fontSize: '1.5rem' }}></i>
+                <div className="mt-2 text-muted">No items available in this category yet.</div>
               </div>
             )}
           </div>
         ))}
       </Container>
 
-      {/* Login/Register Modal */}
-      <Modal show={showLogin} onHide={handleModalClose} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>{isRegistering ? 'Create Account' : 'Login'}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {errorAuth && (
-            <Alert 
-              variant={errorAuth.includes('successful') ? 'success' : 'danger'}
-              className="mb-3"
-            >
-              {errorAuth}
-            </Alert>
-          )}
-          
-          <Form onSubmit={handleAuth}>
-            {isRegistering && (
-              <Form.Group className="mb-3">
-                <Form.Label>Username</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                  minLength={3}
-                />
-              </Form.Group>
-            )}
-
-            <Form.Group className="mb-3">
-              <Form.Label>Email address</Form.Label>
-              <Form.Control
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label>Password</Form.Label>
-              <Form.Control
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-              />
-            </Form.Group>
-
-            <div className="d-grid gap-2">
-              <Button
-                variant={isRegistering ? "success" : "primary"}
-                type="submit"
-                disabled={loadingAuth}
-              >
-                {loadingAuth ? (
-                  <span>
-                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    {isRegistering ? 'Creating Account...' : 'Logging in...'}
-                  </span>
-                ) : (
-                  isRegistering ? 'Create Account' : 'Login'
-                )}
-              </Button>
-              
-              <Button
-                variant="link"
-                onClick={() => {
-                  setIsRegistering(!isRegistering);
-                  setErrorAuth(null);
-                }}
-              >
-                {isRegistering 
-                  ? 'Already have an account? Login' 
-                  : "Don't have an account? Register"}
-              </Button>
-            </div>
-          </Form>
-        </Modal.Body>
-      </Modal>
-
-      {/* Toast Notifications */}
-      <ToastContainer position="top-end" className="p-3">
+      {/* Enhanced Toast Notifications */}
+      <ToastContainer position="top-end" className="p-3 position-fixed">
         <Toast 
           show={showToast} 
           onClose={() => setShowToast(false)} 
-          delay={3000} 
+          delay={4000} 
           autohide
           bg={toastVariant}
         >
-          <Toast.Body className="text-white">
-            {toastMessage}
+          <Toast.Body className="text-white d-flex align-items-center">
+            {toastVariant === 'success' ? (
+              <i className="bi bi-check-circle-fill me-2"></i>
+            ) : (
+              <i className="bi bi-exclamation-triangle-fill me-2"></i>
+            )}
+            <span className="fw-medium">{toastMessage}</span>
           </Toast.Body>
         </Toast>
       </ToastContainer>
 
       <style>{`
-        /* Menu page specific styles */
+        /* Enhanced Card Styles */
         .hover-card {
-          transition: transform 0.2s, box-shadow 0.2s;
+          transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+          border: 1px solid rgba(0,0,0,0.08);
         }
+        
         .hover-card:hover {
-          transform: translateY(-5px);
-          box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
+          transform: translateY(-12px) scale(1.02);
+          box-shadow: 0 20px 40px rgba(0,0,0,0.15) !important;
         }
-        .card-title {
-          font-size: 1.1rem;
-        }
-
-        /* Navbar styles - same as Home page */
-        .nav-link-custom {
-          color: #4a4a4a;
-          font-weight: 500;
-          transition: color 0.2s;
+        
+        .hover-card:hover .card-img-top {
+          transform: scale(1.05);
         }
 
-        .nav-link-custom:hover {
-          color: #7c4dff;
-        }
-
-        .nav-link-custom.active {
-          color: #7c4dff !important;
-        }
-
-        .nav-link-custom.user-name {
-          color: #7c4dff;
-          font-weight: 500;
-          display: flex;
-          align-items: center;
-          padding: 0.5rem 1rem;
-          background: rgba(124, 77, 255, 0.1);
-          border-radius: 20px;
-        }
-
-        .login-btn, .logout-btn {
-          border-radius: 20px;
-          padding: 0.5rem 1.2rem;
-          transition: all 0.2s;
-        }
-
-        .login-btn {
-          background: #7c4dff;
-          border-color: #7c4dff;
-        }
-
-        .login-btn:hover {
-          background: #6039cc;
-          border-color: #6039cc;
-          transform: translateY(-2px);
-        }
-
-        .logout-btn {
-          color: #dc3545;
-          border-color: #dc3545;
-        }
-
-        .logout-btn:hover {
-          background: #dc3545;
-          color: white;
-          transform: translateY(-2px);
-        }
-
-        /* Brand gradient text */
-        .text-gradient {
-          background: linear-gradient(45deg, #7c4dff, #6839cc);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-        }
-
-        /* Favorite button styles */
+        /* Enhanced Favorite Button */
         .favorite-btn {
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-          cursor: pointer;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          backdrop-filter: blur(10px);
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
-        .favorite-btn:hover {
+        .favorite-btn:hover:not(:disabled) {
           background: rgba(255, 255, 255, 1) !important;
+          transform: scale(1.2);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        }
+
+        .favorite-btn:active:not(:disabled) {
           transform: scale(1.1);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Category Header Styling */
+        .text-primary {
+          color: #007bff !important;
+        }
+
+        /* Badge Styling */
+        .bg-primary-subtle {
+          background-color: rgba(13, 110, 253, 0.1) !important;
+        }
+
+        .bg-danger-subtle {
+          background-color: rgba(220, 53, 69, 0.1) !important;
+        }
+
+        /* Toast Enhancements */
+        .toast-body {
+          font-size: 0.95rem;
+        }
+
+        /* Loading Spinner */
+        .spinner-border-sm {
+          border-width: 2px;
+        }
+
+        /* Header Gradient */
+        .bg-primary {
+          background: linear-gradient(135deg, #007bff 0%, #0056b3 100%) !important;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+          .favorite-btn {
+            width: 40px;
+            height: 40px;
+            top: 10px;
+            right: 10px;
+            padding: 8px;
+          }
+          
+          .hover-card:hover {
+            transform: translateY(-6px) scale(1.01);
+          }
+          
+          .card-body {
+            padding: 1rem !important;
+          }
+        }
+
+        @media (max-width: 576px) {
+          .hover-card:hover {
+            transform: translateY(-4px);
+          }
+        }
+
+        /* Card Title Styling */
+        .card-title {
+          font-size: 1.15rem;
+          line-height: 1.3;
+          color: #2c3e50;
+        }
+
+        /* Price Styling */
+        .h4.text-primary {
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          font-weight: 700;
         }
       `}</style>
     </div>
