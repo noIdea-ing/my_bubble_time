@@ -1,14 +1,16 @@
-import React from 'react'
-import Navbar from '../components/Navbar'
-import { Container, Row, Col, Card, Button } from 'react-bootstrap'
-import { FaInfoCircle, FaStar, FaMapMarkerAlt } from 'react-icons/fa'
-import { useNavigate } from 'react-router-dom'
+import React from 'react';
+import { Container, Row, Col, Card, Button } from 'react-bootstrap';
+import Navbar from '../components/Navbar';
+import { useNavigate } from 'react-router-dom';
+import { FaUsers, FaStar, FaMapMarkerAlt } from 'react-icons/fa';
 
 const Home = () => {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
+
   return (
     <div className="bg-light min-vh-100">
       <Navbar />
+
       {/* Hero Section */}
       <div
         style={{
@@ -43,7 +45,7 @@ const Home = () => {
           <Col md={4}>
             <Card className="h-100 shadow-sm card-hover animate__animated animate__fadeInUp" style={{ transition: 'transform 0.3s, box-shadow 0.3s' }}>
               <Card.Body className="text-center">
-                <FaInfoCircle size={40} className="mb-3 text-primary" />
+                <FaUsers size={40} className="mb-3 text-primary" />
                 <h4>About Us</h4>
                 <p>
                   Established in 2021, My Bubble Time Cafe brings you delightful and variety foods with a modern twist. We carefully select our
@@ -73,7 +75,7 @@ const Home = () => {
                 <FaMapMarkerAlt size={40} className="mb-3 text-danger" />
                 <h4>Visit Us</h4>
                 <p>
-                  Open daily from 11.30 AM to 9 PM. Located in the Parit Raja, we offer a comfortable space to enjoy your favorite
+                  Open daily from 11.30 AM to 9 PM *except Saturday*. Located in the Parit Raja, we offer a comfortable space to enjoy your favorite
                   drinks with friends and family. Buffet parties are enjoyed!
                 </p>
               </Card.Body>
@@ -81,25 +83,43 @@ const Home = () => {
           </Col>
         </Row>
       </Container>
+
       <style>{`
         .card-hover:hover {
           transform: scale(1.05);
           box-shadow: 0 8px 32px rgba(124,77,255,0.15);
         }
-        .animate__animated { animation-duration: 1s; }
-        .animate__fadeInDown { animation-name: fadeInDown; }
-        .animate__fadeInUp { animation-name: fadeInUp; }
-        @keyframes fadeInDown {
-          from { opacity: 0; transform: translateY(-40px); }
-          to { opacity: 1; transform: translateY(0); }
+        
+        .animate__fadeInDown { 
+          animation-name: fadeInDown; 
         }
+        
+        .animate__fadeInUp { 
+          animation-name: fadeInUp; 
+        }
+        
+        @keyframes fadeInDown {
+          from { 
+            opacity: 0; 
+            transform: translateY(-40px); 
+          } to { 
+            opacity: 1; 
+            transform: translateY(0); 
+          }
+        }
+        
         @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(40px); }
-          to { opacity: 1; transform: translateY(0); }
+          from { 
+            opacity: 0; 
+            transform: translateY(40px); 
+          } to { 
+            opacity: 1; 
+            transform: translateY(0); 
+          }
         }
       `}</style>
     </div>
-  )
-}
+  );
+};
 
-export default Home
+export default Home;
